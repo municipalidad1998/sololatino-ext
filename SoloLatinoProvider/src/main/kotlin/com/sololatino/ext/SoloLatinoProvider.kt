@@ -5,6 +5,7 @@ import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
 import org.jsoup.nodes.Element
+import java.net.URLDecoder
 
 /**
  * Provider para https://sololatino.net
@@ -17,7 +18,17 @@ import org.jsoup.nodes.Element
  *                           + p.text-sm.leading-relaxed (sinopsis)
  *  - Episodios:             div[data-season-panel] > a.ep-item (p.ep-num -> "E12")
  *  - Reproductores:         button.server-btn[data-player-token]
- *                           -> POST /api/player-url  (X-CSRF-TOKEN) -> { url, type }
+ *                           -> POST /api/player-url -> { url, type }
+ *
+ * IMPORTANTE (verificado con peticiones reales):
+ *  - Las paginas publicas sirven desde cache de Cloudflare (cf-cache-status: HIT)
+ *    SIN cookies y con un csrf-token meta rancio -> un POST directo responde 419.
+ *  - El flujo valido es: (1) GET a una pagina dinamica (/VIP, cf-cache DYNAMIC)
+ *    que establece las cookies XSRF-TOKEN + sololatinonet-session, y (2) enviar
+ *    el header X-XSRF-TOKEN con el valor de esa cookie (URL-decoded).
+ *  - Los resolvedores "iframe" de embed69.org y player.pelisserieshoy.com usan
+ *    el mismo player con dataLink cifrado (POW + AES), que maneja
+ *    Embed69Extractor.
  */
 class SoloLatinoProvider : MainAPI() {
     override var mainUrl = "https://sololatino.net"
@@ -60,6 +71,18 @@ class SoloLatinoProvider : MainAPI() {
     }
 
     private suspend fun catalogDocument(url: String) = app.get(url).document
+
+    /**
+     * Establece la sesion de Laravel y devuelve el valor de la cookie
+     * XSRF-TOKEN (URL-decoded) para el header X-XSRF-TOKEN.
+     */
+    private suspend fun openSession(): String {
+        val session = app.get("$mainUrl/VIP")
+        val raw = session.headers.values("Set-Cookie")
+            .firstOrNull { it.startsWith("XSRF-TOKEN=") }
+            ?.substringAfter("XSRF-TOKEN=")?.substringBefore(";") ?: ""
+        return if (raw.isNotBlank()) URLDecoder.decode(raw, "UTF-8") else raw
+    }
 
     // ---------- main page ----------
 
@@ -147,21 +170,22 @@ class SoloLatinoProvider : MainAPI() {
 
     // ---------- links ----------
 
-    private fun playerHeaders(csrf: String) = mapOf(
-        "Content-Type" to "application/json",
-        "X-CSRF-TOKEN" to csrf,
-        "Accept" to "application/json",
-    )
-
     override suspend fun loadLinks(
         data: String,
         isCasting: Boolean,
         subtitleCallback: (SubtitleFile) -> Unit,
         callback: (ExtractorLink) -> Unit
     ): Boolean {
+        // 1. Sesion: sin esto el POST responde 419 (ver cabecera de la clase)
+        val xsrf = openSession()
+
+        // 2. Pagina del episodio/pelicula con los tokens de servidores
         val doc = catalogDocument(data)
-        val csrf = doc.selectFirst("meta[name=csrf-token]")?.attr("content") ?: ""
-        val headers = playerHeaders(csrf)
+        val headers = mapOf(
+            "Content-Type" to "application/json",
+            "Accept" to "application/json",
+            "X-XSRF-TOKEN" to xsrf,
+        )
 
         doc.select("button.server-btn").amap { btn ->
             val token = btn.attr("data-player-token")
@@ -179,13 +203,11 @@ class SoloLatinoProvider : MainAPI() {
                             newExtractorLink(name, name, url)
                         )
 
-                        url.startsWith("https://embed69.org/") -> Embed69Extractor.load(
-                            url, data, subtitleCallback, callback
-                        )
-
                         url.startsWith("https://xupalace.org/video") -> {
                             val regex = """(go_to_player|go_to_playerVast)\('(.*?)'""".toRegex()
-                            regex.findAll(catalogDocument(url).html())
+                            regex.findAll(
+                                app.get(url, headers = mapOf("Referer" to data)).document.html()
+                            )
                                 .map { it.groupValues[2] }
                                 .toList()
                                 .amap {
@@ -194,8 +216,17 @@ class SoloLatinoProvider : MainAPI() {
                         }
 
                         else -> {
-                            catalogDocument(url).selectFirst("iframe")?.attr("src")?.let {
-                                loadExtractor(fixHostsLinks(it), data, subtitleCallback, callback)
+                            // embed69.org y player.pelisserieshoy.com: mismo player
+                            // con dataLink cifrado (POW + AES); otros: iframe generico
+                            val playerDoc = app.get(
+                                url, headers = mapOf("Referer" to data)
+                            ).document
+                            if (playerDoc.select("script").any { it.html().contains("dataLink = [") }) {
+                                Embed69Extractor.load(url, data, subtitleCallback, callback)
+                            } else {
+                                playerDoc.selectFirst("iframe")?.attr("src")?.let {
+                                    loadExtractor(fixHostsLinks(it), data, subtitleCallback, callback)
+                                }
                             }
                         }
                     }
