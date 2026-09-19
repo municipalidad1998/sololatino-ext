@@ -36,8 +36,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3.2.2
+      # El runner ubuntu-latest ya trae el Android SDK preinstalado; solo
+      # aceptamos licencias para que Gradle pueda descargar lo que falte.
+      # (android-actions/setup-android@v3.2.2 falla con sdkmanager exit code 1)
+      - name: Accept Android SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
 
       - name: Build Plugins
         run: |
