@@ -94,6 +94,7 @@ object Embed69Extractor {
             val secretKey = SecretKeySpec(keyBytes, "AES")
             val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
+            val decrypted = cipher.doFinal(ciphertext)
             String(decrypted, Charsets.UTF_8)
         } catch (e: Exception) {
             null
