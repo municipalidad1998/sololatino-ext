@@ -9,6 +9,9 @@ import com.lagradost.cloudstream3.utils.AppUtils
 import com.lagradost.cloudstream3.utils.ExtractorLink
 import com.lagradost.cloudstream3.utils.loadExtractor
 import com.lagradost.cloudstream3.utils.newExtractorLink
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
@@ -119,23 +122,25 @@ suspend fun loadSourceNameExtractor(
     subtitleCallback: (SubtitleFile) -> Unit,
     callback: (ExtractorLink) -> Unit,
 ) {
-    // Invocacion directa (sin CoroutineScope.launch): emitir el link de forma
-    // sincrona evita que CloudStream cierre loadLinks antes de recibirlo,
-    // lo que rompia la descarga.
+    // El builder newExtractorLink es suspend y el callback de loadExtractor
+    // no lo es, por lo que se necesita un scope. La emision llega al reproductor
+    // y a la cola de descarga via el callback compartido de loadLinks.
     loadExtractor(url, referer, subtitleCallback) { link ->
-        callback.invoke(
-            newExtractorLink(
-                "$source[${link.source}]",
-                "$source[${link.source}]",
-                link.url,
-            ) {
-                this.quality = link.quality
-                this.type = link.type
-                this.referer = link.referer
-                this.headers = link.headers
-                this.extractorData = link.extractorData
-            }
-        )
+        CoroutineScope(Dispatchers.IO).launch {
+            callback.invoke(
+                newExtractorLink(
+                    "$source[${link.source}]",
+                    "$source[${link.source}]",
+                    link.url,
+                ) {
+                    this.quality = link.quality
+                    this.type = link.type
+                    this.referer = link.referer
+                    this.headers = link.headers
+                    this.extractorData = link.extractorData
+                }
+            )
+        }
     }
 }
 
