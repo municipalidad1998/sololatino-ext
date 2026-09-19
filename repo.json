@@ -1,0 +1,18 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/municipalidad1998/sololatino-ext/builds/SoloLatinoProvider.cs3",
+    "status": 1,
+    "version": 1,
+    "name": "SoloLatinoProvider",
+    "internalName": "SoloLatinoProvider",
+    "authors": ["municipalidad1998"],
+    "description": "Peliculas, series, animes y doramas en Español Latino",
+    "fileSize": 28117,
+    "repositoryUrl": "https://github.com/municipalidad1998/sololatino-ext",
+    "language": "mx",
+    "tvTypes": ["Movie", "TvSeries", "Anime", "Cartoon"],
+    "iconUrl": "https://sololatino.net/wp-content/uploads/2020/10/cropped-logo-final-192x192.png",
+    "apiVersion": 1,
+    "fileHash": "sha256-514f208022246f958dc5517a02d98e4819d77c8fc0611067fd9151d5278e2cfe"
+  }
+]
