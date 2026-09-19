@@ -73,15 +73,26 @@ class SoloLatinoProvider : MainAPI() {
     private suspend fun catalogDocument(url: String) = app.get(url).document
 
     /**
-     * Establece la sesion de Laravel y devuelve el valor de la cookie
-     * XSRF-TOKEN (URL-decoded) para el header X-XSRF-TOKEN.
+     * Establece la sesion de Laravel y devuelve el token XSRF (URL-decoded)
+     * y las cookies crudas para el header Cookie.
+     *
+     * CRITICO (probado con peticiones reales): la app NO persiste cookies
+     * entre app.get y app.post (clientes independientes), por lo que el
+     * header Cookie debe enviarse manualmente en el POST. Sin el jar
+     * completo, el endpoint responde 419 "CSRF token mismatch".
      */
-    private suspend fun openSession(): String {
+    private suspend fun openSession(): Pair<String, String> {
         val session = app.get("$mainUrl/VIP")
-        val raw = session.headers.values("Set-Cookie")
-            .firstOrNull { it.startsWith("XSRF-TOKEN=") }
-            ?.substringAfter("XSRF-TOKEN=")?.substringBefore(";") ?: ""
-        return if (raw.isNotBlank()) URLDecoder.decode(raw, "UTF-8") else raw
+        val raw = session.headers.values("Set-Cookie").mapNotNull { setCookie ->
+            val pair = setCookie.substringBefore(";").trim()
+            if (pair.contains("=")) pair else null
+        }
+        val xsrf = URLDecoder.decode(
+            raw.firstOrNull { it.startsWith("XSRF-TOKEN=") }
+                ?.substringAfter("XSRF-TOKEN=") ?: "",
+            "UTF-8"
+        )
+        return Pair(xsrf, raw.joinToString("; "))
     }
 
     // ---------- main page ----------
@@ -177,14 +188,15 @@ class SoloLatinoProvider : MainAPI() {
         callback: (ExtractorLink) -> Unit
     ): Boolean {
         // 1. Sesion: sin esto el POST responde 419 (ver cabecera de la clase)
-        val xsrf = openSession()
+        val (xsrf, jar) = openSession()
 
         // 2. Pagina del episodio/pelicula con los tokens de servidores
         val doc = catalogDocument(data)
         val headers = mapOf(
-            "Content-Type" to "application/json",
             "Accept" to "application/json",
             "X-XSRF-TOKEN" to xsrf,
+            "Cookie" to jar,
+            "Referer" to data,
         )
 
         doc.select("button.server-btn").amap { btn ->
