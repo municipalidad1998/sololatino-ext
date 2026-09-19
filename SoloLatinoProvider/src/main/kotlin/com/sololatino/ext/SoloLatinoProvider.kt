@@ -59,7 +59,7 @@ class SoloLatinoProvider : MainAPI() {
         }
     }
 
-    private fun catalogDocument(url: String) = app.get(url).document
+    private suspend fun catalogDocument(url: String) = app.get(url).document
 
     // ---------- main page ----------
 
