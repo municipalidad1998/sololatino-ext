@@ -42,9 +42,24 @@ object Embed69Extractor {
             }?.substringAfter("dataLink = ")
             ?.substringBefore(";")?.let {
                 AppUtils.tryParseJson<List<ServersByLang>>(it)?.amap { lang ->
-                    val links = lang.sortedEmbeds.amap { decryptAES(it.link!!, aesKey) }
+                    // ORDEN INTENCIONAL: CloudStream reproduce automaticamente el
+                    // PRIMER link emitido. Vidhide (familia EarnVids) es la de
+                    // throttle mas agresivo y mas ads de las tres, por eso se emite
+                    // al final: el reproductor arranca con VOE (la mas ligera) y
+                    // streamwise queda de respaldo. Reversible: si el sitio cambia
+                    // su ranking, se puede volver al orden original.
+                    val rank = { url: String ->
+                        when {
+                            url.contains("voe.") -> 0
+                            url.contains("hglink.") || url.contains("streamwish.") -> 1
+                            else -> 2 // vidhide y otros al final
+                        }
+                    }
+                    val links = lang.sortedEmbeds
+                        .mapNotNull { decryptAES(it.link!!, aesKey) }
+                        .sortedBy { rank(it) }
                     if (links.isNotEmpty()) {
-                        links.filterNotNull().amap {
+                        links.amap {
                             loadSourceNameExtractor(
                                 lang.videoLanguage!!,
                                 fixHostsLinks(it),
