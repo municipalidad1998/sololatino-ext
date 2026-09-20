@@ -150,16 +150,21 @@ suspend fun loadSourceNameExtractor(
  */
 fun fixHostsLinks(url: String): String {
     return url
-        .replaceFirst("https://hglink.to", "https://streamwish.to")
-        .replaceFirst("https://swdyu.com", "https://streamwish.to")
-        .replaceFirst("https://cybervynx.com", "https://streamwish.to")
-        .replaceFirst("https://dumbalag.com", "https://streamwish.to")
-        .replaceFirst("https://mivalyo.com", "https://vidhidepro.com")
-        .replaceFirst("https://dinisglows.com", "https://vidhidepro.com")
-        .replaceFirst("https://dhtpre.com", "https://vidhidepro.com")
-        .replaceFirst("https://filemoon.link", "https://filemoon.sx")
-        .replaceFirst("https://sblona.com", "https://watchsb.com")
-        .replaceFirst("https://lulu.st", "https://lulustream.com")
-        .replaceFirst("https://uqload.io", "https://uqload.com")
-        .replaceFirst("https://do7go.com", "https://dood.la")
+    // Rotaciones vidhide (verificado con peticiones reales: el host del embed
+    // del servidor gratuito rota a morencius.com; minochinos.com es la misma
+    // familia según el player del sitio).
+    .replaceFirst("https://morencius.com", "https://vidhidepro.com")
+    .replaceFirst("https://minochinos.com", "https://vidhidepro.com")
+    .replaceFirst("https://hglink.to", "https://streamwish.to")
+    .replaceFirst("https://swdyu.com", "https://streamwish.to")
+    .replaceFirst("https://cybervynx.com", "https://streamwish.to")
+    .replaceFirst("https://dumbalag.com", "https://streamwish.to")
+    .replaceFirst("https://mivalyo.com", "https://vidhidepro.com")
+    .replaceFirst("https://dinisglows.com", "https://vidhidepro.com")
+    .replaceFirst("https://dhtpre.com", "https://vidhidepro.com")
+    .replaceFirst("https://filemoon.link", "https://filemoon.sx")
+    .replaceFirst("https://sblona.com", "https://watchsb.com")
+    .replaceFirst("https://lulu.st", "https://lulustream.com")
+    .replaceFirst("https://uqload.io", "https://uqload.com")
+    .replaceFirst("https://do7go.com", "https://dood.la")
 }
